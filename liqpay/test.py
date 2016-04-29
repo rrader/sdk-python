@@ -1,6 +1,7 @@
 # coding=utf-8
 import unittest
 from liqpay import LiqPay, ParamValidationError
+from collections import OrderedDict
 
 
 class TestLiqPaySimple(unittest.TestCase):
@@ -21,12 +22,12 @@ class TestLiqPaySimple(unittest.TestCase):
             u'</form>'
         )
         # test unicode issue with ru symbols
-        params = {
-            "amount": "3940",
-            "currency": "UAH",
-            "description": "тест",
-            "test": "cccc"
-        }
+        params = dict(
+            amount="3940",
+            currency="UAH",
+            description="тест",
+            test="cccc"
+        )
         self.assertEqual(self.liqpay.cnb_form(params), expected_form_out)
 
         # ru symbols in unicode

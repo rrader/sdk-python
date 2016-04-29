@@ -5,6 +5,8 @@ supports python 2.7.x version
 requires requests module
 """
 
+from __future__ import unicode_literals
+
 __title__ = 'LiqPay Python SDK'
 __version__ = '1.0'
 
@@ -12,26 +14,10 @@ import base64
 from copy import deepcopy
 import hashlib
 import json
-from urlparse import urljoin
+from six.moves.urllib.parse import urljoin
 
 import requests
-
-
-def to_unicode(s):
-    """
-    :param s:
-    :return: unicode value (decoded utf-8)
-    """
-    if isinstance(s, unicode):
-        return s
-
-    if isinstance(s, basestring):
-        return s.decode('utf-8', 'strict')
-
-    if hasattr(s, '__unicode__'):
-        return s.__unicode__()
-
-    return unicode(bytes(s), 'utf-8', 'strict')
+from collections import OrderedDict
 
 
 class ParamValidationError(Exception):
@@ -57,9 +43,10 @@ class LiqPay(object):
         self._host = host
 
     def _make_signature(self, *args):
-        smart_str = lambda x: to_unicode(x).encode('utf-8')
-        joined_fields = ''.join(smart_str(x) for x in args)
-        return base64.b64encode(hashlib.sha1(joined_fields).digest())
+        smart_str = lambda x: str(x).encode('utf-8')
+        joined_fields = b''.join(smart_str(x) for x in args)
+        print(joined_fields)
+        return base64.b64encode(hashlib.sha1(joined_fields).digest()).decode()
 
     def _prepare_params(self, params):
         params = {} if params is None else deepcopy(params)
@@ -76,7 +63,7 @@ class LiqPay(object):
         request_url = urljoin(self._host, url)
         request_data = {'data': json_encoded_params, 'signature': signature}
         response = requests.post(request_url, data=request_data, verify=False)
-        return json.loads(response.content)
+        return json.loads(response.content.decode('utf-8'))
 
     def cnb_form(self, params):
         params = self._prepare_params(params)
@@ -93,16 +80,15 @@ class LiqPay(object):
         # spike to set correct values for language, currency and sandbox params
         language = params.get('language', 'ru')
         currency = params['currency']
-        params.update(
-            language=language,
-            currency=currency if currency != 'RUR' else 'RUB',
-            sandbox=int(bool(params.get('sandbox')))
-        )
-        params_templ = {'data': base64.b64encode(json.dumps(params))}
+        params['language'] = language
+        params['currency'] = currency if currency != 'RUR' else 'RUB'
+        params['sandbox'] = int(bool(params.get('sandbox')))
+        print(json.dumps(params))
+        params_templ = {'data': base64.b64encode(json.dumps(params).encode('utf-8')).decode()}
         params_templ['signature'] = self._make_signature(self._private_key, params_templ['data'], self._private_key)
         form_action_url = urljoin(self._host, '3/checkout/')
-        format_input = lambda k, v: self.INPUT_TEMPLATE.format(name=k, value=to_unicode(v))
-        inputs = [format_input(k, v) for k, v in params_templ.iteritems()]
+        format_input = lambda k, v: self.INPUT_TEMPLATE.format(name=k, value=str(v))
+        inputs = [format_input(k, v) for k, v in params_templ.items()]
         return self.FORM_TEMPLATE.format(
             action=form_action_url,
             language=language,
@@ -111,7 +97,7 @@ class LiqPay(object):
 
     def cnb_signature(self, params):
         params = self._prepare_params(params)
-        print base64.b64encode(json.dumps(params))
+        print(base64.b64encode(json.dumps(params)))
         return self._make_signature(self._private_key, base64.b64encode(json.dumps(params)), self._private_key)
 
     def str_to_sign(self, str):
